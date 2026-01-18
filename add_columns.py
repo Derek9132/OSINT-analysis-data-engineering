@@ -24,6 +24,8 @@ if __name__ == "__main__":
         mobile_detections = pd.read_excel(mobile_path, sheet_name=3)
 
         # KEV
+        kev_path = base_dir/"raw"/"kev-mitre.csv"
+        kev_attack = pd.read_csv(kev_path)
 
         # add subtechniques to mobile-attack
         mobile_techniques["sort_column"] = (mobile_techniques["ID"].str.replace("T", "")).astype('float')

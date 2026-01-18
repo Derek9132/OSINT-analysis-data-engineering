@@ -4,7 +4,7 @@ from generate import download
 
 if __name__ == "__main__":
     try:
-        base_dir = Path(__file__).resolve().parent
+        base_dir = str(Path(__file__).resolve().parent)
 
         # enterprise-attack dataframes
         enterprise_path = base_dir/"raw"/"enterprise-stix.xlsx"
