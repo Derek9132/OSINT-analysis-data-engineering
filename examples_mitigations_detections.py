@@ -2,6 +2,9 @@ import pandas as pd
 import traceback
 from pathlib import Path
 
+def style():
+    pass
+
 def examples_mitigations_detections(techniques, examples, mitigations, detections): # 4 datasets as parameters
     # define new dataframe
 

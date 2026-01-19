@@ -1,10 +1,11 @@
 import pandas as pd
 from pathlib import Path
 from generate import download
+import traceback
 
 if __name__ == "__main__":
     try:
-        base_dir = str(Path(__file__).resolve().parent)
+        base_dir = Path(__file__).resolve().parent
 
         # enterprise-attack dataframes
         enterprise_path = base_dir/"raw"/"enterprise-stix.xlsx"
@@ -29,6 +30,10 @@ if __name__ == "__main__":
         enterprise_and_mobile = enterprise_techniques[enterprise_techniques["ID"].isin(mobile_techniques["ID"])]
 
         # export
+        with pd.ExcelWriter(base_dir/"comparison"/"comparison.xlsx") as writer:
+            enterprise_not_mobile.to_excel(writer, sheet_name="Enterprise_not_Mobile")
+            mobile_not_enterprise.to_excel(writer, sheet_name="Mobile_not_Enterprise")
+            enterprise_and_mobile.to_excel(writer, sheet_name="Enterprise_and_Mobile")
 
     except Exception as e:
         print(e)
