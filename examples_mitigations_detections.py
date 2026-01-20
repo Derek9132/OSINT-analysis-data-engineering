@@ -1,9 +1,14 @@
 import pandas as pd
 import traceback
 from pathlib import Path
+from sqlalchemy import create_engine
+import os
+from dotenv import load_dotenv
 
-def style():
-    pass
+def to_sql_table(dataframe, table_name, engine):
+    engine = create_engine(engine)
+
+    dataframe.to_sql(name=table_name, con=engine, if_exists="replace", index=False)
 
 def examples_mitigations_detections(techniques, examples, mitigations, detections): # 4 datasets as parameters
     # define new dataframe
@@ -18,7 +23,6 @@ def examples_mitigations_detections(techniques, examples, mitigations, detection
 
     # for each technique, find counts in examples, mitigations, detections
     for tech in techniques_list:
-        print(tech)
         examples_count = examples["target ID"].value_counts().get(tech, 0)
         num_examples.append(examples_count)
 
@@ -68,12 +72,18 @@ if __name__ == "__main__":
         emd_mobile = examples_mitigations_detections(mobile_techniques,mobile_examples, mobile_mitigations, mobile_detections)
         emd_ics = examples_mitigations_detections(ics_techniques, ics_examples, ics_mitigations, ics_detections)
 
-        print(emd_enterprise)
-
         with pd.ExcelWriter(output_path) as writer:
             emd_enterprise.to_excel(writer, sheet_name="enterprise counts")
             emd_mobile.to_excel(writer, sheet_name="mobile counts")
             emd_ics.to_excel(writer, sheet_name="ICS count")
+
+        # export to SQL
+        load_dotenv()
+
+        engine = os.getenv("DATABASE_URL")
+        to_sql_table(emd_enterprise, "emd_enterprise", engine)
+        to_sql_table(emd_mobile, "emd_mobile", engine)
+        to_sql_table(emd_ics, "emd_ics", engine)
 
     except Exception as e:
         print("Error")

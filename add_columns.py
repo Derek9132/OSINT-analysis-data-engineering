@@ -4,6 +4,9 @@ import re
 import spacy
 import traceback
 from collections import Counter
+import os
+from sqlalchemy import create_engine
+from dotenv import load_dotenv
 
 def clean_text(description, nlp): # pandas column as parameter
 
@@ -131,7 +134,17 @@ def get_associated_techniques(row):
         else:
             to_return.append(tech[0] + " (" + tech[1] + "." + tech[2] + ")")
 
-    return ", ".join(to_return)
+    unique = list(set(to_return))
+
+    return ", ".join(unique)
+
+def to_sql_table(dataframe, table_name, engine):
+    engine = create_engine(engine)
+
+    try:
+        dataframe.to_sql(name=table_name, con=engine, if_exists="replace", index=False)
+    except Exception as e:
+        print(e)
 
 
 if __name__ == "__main__":
@@ -172,18 +185,18 @@ if __name__ == "__main__":
                 is_sub.append("FALSE")
                 sub_id.append("")
 
-        mobile_techniques.insert(loc=13, column="is_subtechnique", value=is_sub)
-        mobile_techniques.insert(loc=14, column="subtechnique of:", value=sub_id)
+        mobile_techniques.insert(loc=13, column="is sub-technique", value=is_sub)
+        mobile_techniques.insert(loc=14, column="sub-technique of", value=sub_id)
 
         # associated and follow-up techniques
-        enterprise_techniques["Associated and/or follow-up techniques"] = enterprise_techniques.apply(get_associated_techniques, axis=1)
-        mobile_techniques["Associated and/or follow-up techniques"] = mobile_techniques.apply(get_associated_techniques, axis=1)
-        ics_techniques["Associated and/or follow-up techniques"] = ics_techniques.apply(get_associated_techniques, axis=1)
+        enterprise_techniques["associated and/or followup techniques"] = enterprise_techniques.apply(get_associated_techniques, axis=1)
+        mobile_techniques["associated and/or followup techniques"] = mobile_techniques.apply(get_associated_techniques, axis=1)
+        ics_techniques["associated and/or followup techniques"] = ics_techniques.apply(get_associated_techniques, axis=1)
 
         # associated codes, commands, programs
-        enterprise_techniques["Associated codes, commands, programs"] = enterprise_techniques["description"].map(get_codes_commands)
-        mobile_techniques["Associated codes, commands, programs"] = mobile_techniques["description"].map(get_codes_commands)
-        ics_techniques["Associated codes, commands, programs"] = ics_techniques["description"].map(get_codes_commands)
+        enterprise_techniques["associated codes, commands, programs"] = enterprise_techniques["description"].map(get_codes_commands)
+        mobile_techniques["associated codes, commands, programs"] = mobile_techniques["description"].map(get_codes_commands)
+        ics_techniques["associated codes, commands, programs"] = ics_techniques["description"].map(get_codes_commands)
 
         # get more citations
         enterprise_techniques["relationship citations"] = enterprise_techniques.apply(get_more_citations, axis=1)
@@ -191,24 +204,21 @@ if __name__ == "__main__":
         ics_techniques["relationship citations"] = ics_techniques.apply(get_more_citations, axis=1)
 
         # clean descriptions
-        print("starting cleaning")
-        enterprise_techniques["cleaned_description"] = enterprise_techniques["description"].apply(clean_text, args=(nlp,))
-        print("enterprise cleaned")
-        mobile_techniques["cleaned_description"] = mobile_techniques["description"].apply(clean_text, args=(nlp,))
-        print("mobile cleaned")
-        ics_techniques["cleaned_description"] = ics_techniques["description"].apply(clean_text, args=(nlp,))
-        print("ics cleaned")
+        enterprise_techniques["cleaned description"] = enterprise_techniques["description"].apply(clean_text, args=(nlp,))
+        mobile_techniques["cleaned description"] = mobile_techniques["description"].apply(clean_text, args=(nlp,))
+        ics_techniques["cleaned description"] = ics_techniques["description"].apply(clean_text, args=(nlp,))
+    
         # most common verbs and nouns
-        enterprise_techniques["most_common_verbs"] = enterprise_techniques["cleaned_description"].apply(most_common_words, args=(nlp,"verb"))
-        mobile_techniques["most_common_verbs"] = mobile_techniques["cleaned_description"].apply(most_common_words, args=(nlp,"verb"))
-        ics_techniques["most_common_verbs"] = ics_techniques["cleaned_description"].apply(most_common_words, args=(nlp,"verb"))
+        enterprise_techniques["most common verbs"] = enterprise_techniques["cleaned description"].apply(most_common_words, args=(nlp,"verb"))
+        mobile_techniques["most common verbs"] = mobile_techniques["cleaned description"].apply(most_common_words, args=(nlp,"verb"))
+        ics_techniques["most common verbs"] = ics_techniques["cleaned description"].apply(most_common_words, args=(nlp,"verb"))
 
-        enterprise_techniques["most_common_nouns"] = enterprise_techniques["cleaned_description"].apply(most_common_words, args=(nlp,"noun"))
-        mobile_techniques["most_common_nouns"] = mobile_techniques["cleaned_description"].apply(most_common_words, args=(nlp,"noun"))
-        ics_techniques["most_common_nouns"] = ics_techniques["cleaned_description"].apply(most_common_words, args=(nlp,"noun"))
+        enterprise_techniques["most common nouns"] = enterprise_techniques["cleaned description"].apply(most_common_words, args=(nlp,"noun"))
+        mobile_techniques["most common nouns"] = mobile_techniques["cleaned description"].apply(most_common_words, args=(nlp,"noun"))
+        ics_techniques["most common nouns"] = ics_techniques["cleaned description"].apply(most_common_words, args=(nlp,"noun"))
 
         # Add CVEs column (enterprise domain only)
-        enterprise_techniques["CVEs that allow this technique:"] = "The following common vulnerabilities allow this technique: \n"
+        enterprise_techniques["CVEs that allow this technique"] = "The following common vulnerabilities allow this technique: \n"
 
         for row in kev_attack.itertuples():
             # combine CVE ID, name, comments
@@ -217,12 +227,36 @@ if __name__ == "__main__":
             # find attack_object_id in enterprise_techniques
             current_tech = row.attack_object_id
 
-            enterprise_techniques.loc[enterprise_techniques["ID"] == current_tech, "CVEs that allow this technique:"] = enterprise_techniques.loc[enterprise_techniques["ID"] == current_tech, "CVEs that allow this technique:"] + CVE_string
+            enterprise_techniques.loc[enterprise_techniques["ID"] == current_tech, "CVEs that allow this technique"] = enterprise_techniques.loc[enterprise_techniques["ID"] == current_tech, "CVEs that allow this technique"] + CVE_string
 
-        # export
+        enterprise_techniques.loc[enterprise_techniques["CVEs that allow this technique"] == "The following common vulnerabilities allow this technique: \n", "CVEs that allow this technique"] = "No listed CVEs in the KEV allow this technique"
+
+        # drop first column
+        enterprise_techniques.drop(enterprise_techniques.columns[0], axis=1, inplace=True)
+        mobile_techniques.drop(mobile_techniques.columns[0], axis=1, inplace=True)
+        ics_techniques.drop(ics_techniques.columns[0], axis=1, inplace=True)
+
+        # reorder columns
+        new_order_enterprise = ["ID","STIX ID","name","associated codes, commands, programs","associated and/or followup techniques","CVEs that allow this technique","platforms","tactics","detection","description","cleaned description","most common verbs","most common nouns", "is sub-technique","sub-technique of", "url","created","last modified", "domain","version","contributors","supports remote","impact type","relationship citations"]
+        new_order_mobile = ["ID","STIX ID","name","associated codes, commands, programs","associated and/or followup techniques","platforms","tactics","detection","description","cleaned description","most common verbs","most common nouns", "is sub-technique","sub-technique of", "url","created","last modified", "domain","version","contributors","MTC ID","tactic type","relationship citations"]
+        new_order_ics = ["ID","STIX ID","name","associated codes, commands, programs","associated and/or followup techniques","platforms","tactics","detection","description","cleaned description","most common verbs","most common nouns", "url","created","last modified", "domain","version","contributors","relationship citations"]
+
+        enterprise_techniques = enterprise_techniques[new_order_enterprise]
+        mobile_techniques = mobile_techniques[new_order_mobile]
+        ics_techniques = ics_techniques[new_order_ics]
+
+        # export to excel
         enterprise_techniques.to_excel(base_dir/"add-columns"/"enterprise_techniques_new.xlsx")
         mobile_techniques.to_excel(base_dir/"add-columns"/"mobile_techniques_new.xlsx")
         ics_techniques.to_excel(base_dir/"add-columns"/"ics_techniques_new.xlsx")
+
+        # export to SQL
+        load_dotenv()
+
+        engine = os.getenv("DATABASE_URL")
+        to_sql_table(enterprise_techniques, "enterprise_new", engine)
+        to_sql_table(mobile_techniques, "mobile_new", engine)
+        to_sql_table(ics_techniques, "ics_new", engine)
 
     except Exception as e:
         print("Error")

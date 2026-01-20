@@ -1,7 +1,14 @@
 import pandas as pd
 from pathlib import Path
-from generate import download
 import traceback
+from sqlalchemy import create_engine
+import os
+from dotenv import load_dotenv
+
+def to_sql_table(dataframe, table_name, engine):
+    engine = create_engine(engine)
+
+    dataframe.to_sql(name=table_name, con=engine, if_exists="replace", index=False)
 
 if __name__ == "__main__":
     try:
@@ -35,6 +42,13 @@ if __name__ == "__main__":
             mobile_not_enterprise.to_excel(writer, sheet_name="Mobile_not_Enterprise")
             enterprise_and_mobile.to_excel(writer, sheet_name="Enterprise_and_Mobile")
 
+        # export to SQL
+        load_dotenv()
+
+        engine = os.getenv("DATABASE_URL")
+        to_sql_table(enterprise_not_mobile, "enterprise_not_mobile", engine)
+        to_sql_table(mobile_not_enterprise, "mobile_not_enterprise", engine)
+        to_sql_table(enterprise_and_mobile, "enterprise_and_mobile", engine)
+
     except Exception as e:
         print(e)
-        # redownload files
