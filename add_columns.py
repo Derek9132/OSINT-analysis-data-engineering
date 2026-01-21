@@ -11,12 +11,9 @@ from dotenv import load_dotenv
 def clean_text(description, nlp): # pandas column as parameter
 
     # regular expressions
-    reg_adversary = re.compile("(?:an )?adversar(?:y|ies) *(?:may|can)?")
-    reg_citation = re.compile("\(citation: [a-zA-Z0-9 ]*\)")
-    reg_link = re.compile("\[[^\]]*\]\(https:\/\/attack\.mitre\.org\/techniques\/T[0-9]{4}(?:\/[0-9]{3})?\)")
-
-    # lowercase all
-    description = description.lower()
+    reg_adversary = re.compile("(?:an )?adversar(?:y|ies) *(?:may|can)?", re.IGNORECASE)
+    reg_citation = re.compile("\(citation: [a-zA-Z0-9 ]*\)", re.IGNORECASE)
+    reg_link = re.compile("\[(?:[^\]]*)\]\(https:\/\/attack\.mitre\.org\/(?:software|techniques|tactics)\/(?:(?:S|T|TA)[0-9]{4})\/?(?:[0-9]{3})?\)", re.IGNORECASE)
 
     # replace
     description = description.replace("in order to", "to")
@@ -55,7 +52,9 @@ def clean_text(description, nlp): # pandas column as parameter
 
     #print("completed cleaning")
 
-    return " ".join(filtered)
+    to_return =  " ".join(filtered)
+
+    return "".join([char for char in to_return if char.isalnum() or char == " "])
 
 
 def most_common_words(description, nlp, pos): # verb or noun
@@ -121,7 +120,7 @@ def get_associated_techniques(row):
 
     to_return = []
 
-    re_link = re.compile("\[([^\]]*)\]\(https:\/\/attack\.mitre\.org\/techniques\/(T[0-9]{4})\/?([0-9]{3})?\)")
+    re_link = re.compile("\[([^\]]*)\]\(https:\/\/attack\.mitre\.org\/(?:software|techniques|tactics)\/((?:S|T|TA)[0-9]{4})\/?([0-9]{3})?\)", re.IGNORECASE)
 
     associated_techs = re_link.findall(description)
 
@@ -222,7 +221,7 @@ if __name__ == "__main__":
 
         for row in kev_attack.itertuples():
             # combine CVE ID, name, comments
-            CVE_string = row.capability_group + " (" + row.capability_id + "): " + row.comments + "\n"
+            CVE_string = row.capability_description + " (" + row.capability_id + "): " + row.comments + "\n"
 
             # find attack_object_id in enterprise_techniques
             current_tech = row.attack_object_id
